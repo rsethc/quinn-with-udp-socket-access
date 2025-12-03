@@ -7,7 +7,7 @@ use std::{
     net::{SocketAddr, SocketAddrV6},
     pin::Pin,
     str,
-    sync::{Arc, Mutex, MutexGuard},
+    sync::{Arc, Mutex},
     task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
 };
 

@@ -76,6 +76,9 @@ pub trait AsyncUdpSocket: Send + Sync + Debug + 'static {
     fn may_fragment(&self) -> bool {
         true
     }
+
+    /// Hack to send a buffer as an arbitrary packet on the socket.
+    fn send_to(&self, buf: Vec<u8>, addr: SocketAddr);
 }
 
 /// An object for asynchronously writing to an associated [`AsyncUdpSocket`].

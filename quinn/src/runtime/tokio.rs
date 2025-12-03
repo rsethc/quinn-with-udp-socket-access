@@ -1,18 +1,14 @@
 use std::{
-    future::Future,
-    io,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll, ready},
-    time::Instant,
+    future::Future, io, net::SocketAddr, pin::Pin, sync::Arc, task::{Context, Poll, ready}, thread, time::Instant
 };
 
 use tokio::{
-    io::Interest,
-    time::{Sleep, sleep_until},
+    io::Interest, time::{Sleep, sleep_until}
 };
 
-use super::{AsyncTimer, AsyncUdpSocket, Runtime, UdpSenderHelper, UdpSenderHelperSocket};
+use crate::Runtime;
+
+use super::{AsyncTimer, AsyncUdpSocket, UdpSenderHelper, UdpSenderHelperSocket};
 
 /// A Quinn runtime for Tokio
 #[derive(Debug)]
@@ -100,5 +96,17 @@ impl AsyncUdpSocket for UdpSocket {
 
     fn max_receive_segments(&self) -> usize {
         self.inner.gro_segments()
+    }
+
+    fn send_to(&self, buf: Vec<u8>, addr: SocketAddr) {
+        let io_socket = self.io.clone();
+        thread::spawn(move || { 
+            let tokio_runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+            let _runtime_guard = tokio_runtime.enter();
+            
+            tokio_runtime.block_on(async { 
+                io_socket.send_to(&buf, addr).await
+            }).unwrap();
+        });
     }
 }
