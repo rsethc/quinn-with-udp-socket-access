@@ -7,7 +7,7 @@ use std::{
     net::{SocketAddr, SocketAddrV6},
     pin::Pin,
     str,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
     task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
 };
 
@@ -58,6 +58,12 @@ pub struct Endpoint {
 }
 
 impl Endpoint {
+    /// The raw socket. Useful for hole punching from a server, but use with caution.
+    pub fn use_raw_socket (&self, callback: impl Fn(&dyn AsyncUdpSocket)) {
+        let lock = self.inner.state.lock().unwrap();
+        callback(&*lock.socket);
+    }
+
     /// Helper to construct an endpoint for use with outgoing connections only
     ///
     /// Note that `addr` is the *local* address to bind to, which should usually be a wildcard
