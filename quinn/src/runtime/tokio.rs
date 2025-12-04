@@ -1,5 +1,5 @@
 use std::{
-    future::Future, io, net::SocketAddr, pin::Pin, sync::Arc, task::{Context, Poll, ready}, thread, time::Instant
+    future::Future, io, net::SocketAddr, pin::Pin, sync::Arc, task::{Context, Poll, ready}, thread::{self, sleep}, time::{Duration, Instant}
 };
 
 use tokio::{
@@ -109,6 +109,7 @@ impl AsyncUdpSocket for UdpSocket {
                 let result = tokio_runtime.block_on(async { 
                     io_socket.send_to(&buf, addr).await
                 }).unwrap();
+                assert_eq!(result, buf.len());
                 // println!("bytes believed to have been written: {} of {}", result, buf.len());
                 sleep(Duration::from_millis(1));
             }
