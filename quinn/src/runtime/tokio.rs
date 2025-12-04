@@ -98,6 +98,10 @@ impl AsyncUdpSocket for UdpSocket {
         self.inner.gro_segments()
     }
 
+    fn get_local_port(&self) -> u16 {
+        self.io.local_addr().unwrap().port()
+    }
+
     fn send_to(&self, buf: Vec<u8>, addr: SocketAddr) {
         let io_socket = self.io.clone();
         thread::spawn(move || { 
