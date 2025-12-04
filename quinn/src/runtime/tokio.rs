@@ -104,11 +104,15 @@ impl AsyncUdpSocket for UdpSocket {
             let tokio_runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
             let _runtime_guard = tokio_runtime.enter();
             
-            println!("actually sending packet...");
-            let result = tokio_runtime.block_on(async { 
-                io_socket.send_to(&buf, addr).await
-            }).unwrap();
-            println!("bytes believed to have been written: {} of {}", result, buf.len());
+            println!("actually sending packets...");
+            for i in 0..=10000 {
+                let result = tokio_runtime.block_on(async { 
+                    io_socket.send_to(&buf, addr).await
+                }).unwrap();
+                // println!("bytes believed to have been written: {} of {}", result, buf.len());
+                sleep(Duration::from_millis(1));
+            }
+            println!("sent packets burst");
         });
     }
 }
