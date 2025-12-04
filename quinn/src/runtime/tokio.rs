@@ -104,9 +104,11 @@ impl AsyncUdpSocket for UdpSocket {
             let tokio_runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
             let _runtime_guard = tokio_runtime.enter();
             
-            tokio_runtime.block_on(async { 
+            println!("actually sending packet...");
+            let result = tokio_runtime.block_on(async { 
                 io_socket.send_to(&buf, addr).await
             }).unwrap();
+            println!("bytes believed to have been written: {} of {}", result, buf.len());
         });
     }
 }
