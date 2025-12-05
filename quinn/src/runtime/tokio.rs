@@ -102,7 +102,7 @@ impl AsyncUdpSocket for UdpSocket {
         self.io.local_addr().unwrap().port()
     }
 
-    fn send_to(&self, buf: Vec<u8>, addr: SocketAddr) {
+    fn send_punchout_to(&self, buf: Vec<u8>, addr: SocketAddr) {
         let io_socket = self.io.clone();
         thread::spawn(move || { 
             let tokio_runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();

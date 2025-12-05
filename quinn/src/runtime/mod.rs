@@ -78,7 +78,7 @@ pub trait AsyncUdpSocket: Send + Sync + Debug + 'static {
     }
 
     /// Hack to send a buffer as an arbitrary packet on the socket.
-    fn send_to(&self, buf: Vec<u8>, addr: SocketAddr);
+    fn send_punchout_to(&self, buf: Vec<u8>, addr: SocketAddr);
 
     fn get_local_port(&self) -> u16;
 }
