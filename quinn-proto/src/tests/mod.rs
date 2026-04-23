@@ -49,12 +49,7 @@ use wasm_bindgen_test::wasm_bindgen_test as test;
 fn version_negotiate_server() {
     let _guard = subscribe();
     let client_addr = "[::2]:7890".parse().unwrap();
-    let mut server = Endpoint::new(
-        Default::default(),
-        Some(Arc::new(server_config())),
-        true,
-        None,
-    );
+    let mut server = Endpoint::new(Default::default(), Some(Arc::new(server_config())), true);
     let now = Instant::now();
     let mut buf = Vec::with_capacity(server.config().get_max_udp_payload_size() as usize);
     let event = server.handle(
@@ -92,7 +87,6 @@ fn version_negotiate_client() {
         }),
         None,
         true,
-        None,
     );
     let (_, mut client_ch) = client
         .connect(Instant::now(), client_config(), server_addr, "localhost")
@@ -194,14 +188,15 @@ fn server_stateless_reset() {
     rng.fill_bytes(&mut key_material);
 
     let mut endpoint_config = EndpointConfig::new(Arc::new(reset_key));
-    endpoint_config.cid_generator(move || Box::new(HashedConnectionIdGenerator::from_key(0)));
+    endpoint_config.cid_generator(Arc::new(move || {
+        Box::new(HashedConnectionIdGenerator::from_key(0))
+    }));
     let endpoint_config = Arc::new(endpoint_config);
 
     let mut pair = Pair::new(endpoint_config.clone(), server_config());
     let (client_ch, _) = pair.connect();
     pair.drive(); // Flush any post-handshake frames
-    pair.server.endpoint =
-        Endpoint::new(endpoint_config, Some(Arc::new(server_config())), true, None);
+    pair.server.endpoint = Endpoint::new(endpoint_config, Some(Arc::new(server_config())), true);
     // Force the server to generate the smallest possible stateless reset
     pair.client.connections.get_mut(&client_ch).unwrap().ping();
     info!("resetting");
@@ -224,13 +219,14 @@ fn client_stateless_reset() {
     rng.fill_bytes(&mut key_material);
 
     let mut endpoint_config = EndpointConfig::new(Arc::new(reset_key));
-    endpoint_config.cid_generator(move || Box::new(HashedConnectionIdGenerator::from_key(0)));
+    endpoint_config.cid_generator(Arc::new(move || {
+        Box::new(HashedConnectionIdGenerator::from_key(0))
+    }));
     let endpoint_config = Arc::new(endpoint_config);
 
     let mut pair = Pair::new(endpoint_config.clone(), server_config());
     let (_, server_ch) = pair.connect();
-    pair.client.endpoint =
-        Endpoint::new(endpoint_config, Some(Arc::new(server_config())), true, None);
+    pair.client.endpoint = Endpoint::new(endpoint_config, Some(Arc::new(server_config())), true);
     // Send something big enough to allow room for a smaller stateless reset.
     pair.server.connections.get_mut(&server_ch).unwrap().close(
         pair.time,
@@ -253,13 +249,14 @@ fn stateless_reset_limit() {
     let _guard = subscribe();
     let remote = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 42);
     let mut endpoint_config = EndpointConfig::default();
-    endpoint_config.cid_generator(move || Box::new(RandomConnectionIdGenerator::new(8)));
+    endpoint_config.cid_generator(Arc::new(move || {
+        Box::new(RandomConnectionIdGenerator::new(8))
+    }));
     let endpoint_config = Arc::new(endpoint_config);
     let mut endpoint = Endpoint::new(
         endpoint_config.clone(),
         Some(Arc::new(server_config())),
         true,
-        None,
     );
     let time = Instant::now();
     let mut buf = Vec::new();
@@ -990,6 +987,69 @@ fn stream_id_limit() {
 }
 
 #[test]
+fn streams_blocked() {
+    let _guard = subscribe();
+    let server = ServerConfig {
+        transport: Arc::new(TransportConfig {
+            max_concurrent_uni_streams: 1u32.into(),
+            ..TransportConfig::default()
+        }),
+        ..server_config()
+    };
+    let mut pair = Pair::new(Default::default(), server);
+    let (client_ch, server_ch) = pair.connect();
+
+    // Use up the only stream slot, then try to open another
+    let s = pair
+        .client_streams(client_ch)
+        .open(Dir::Uni)
+        .expect("first uni stream");
+    assert_eq!(pair.client_streams(client_ch).open(Dir::Uni), None);
+
+    // Send data so the STREAMS_BLOCKED piggybacks on an outgoing packet
+    pair.client_send(client_ch, s).write(b"hi").unwrap();
+    pair.drive();
+
+    assert_eq!(
+        pair.client_conn_mut(client_ch)
+            .stats()
+            .frame_tx
+            .streams_blocked_uni,
+        1
+    );
+    assert_eq!(
+        pair.server_conn_mut(server_ch)
+            .stats()
+            .frame_rx
+            .streams_blocked_uni,
+        1
+    );
+}
+
+#[test]
+fn streams_blocked_not_sent_under_limit() {
+    let _guard = subscribe();
+    let mut pair = Pair::default();
+    let (client_ch, _server_ch) = pair.connect();
+
+    // Default config allows many streams; opening one should not trigger STREAMS_BLOCKED
+    let s = pair
+        .client_streams(client_ch)
+        .open(Dir::Uni)
+        .expect("open stream");
+    pair.client_send(client_ch, s).write(b"hi").unwrap();
+    pair.drive();
+
+    assert_eq!(
+        pair.client_conn_mut(client_ch)
+            .stats()
+            .frame_tx
+            .streams_blocked_uni,
+        0
+    );
+}
+
+#[test]
 fn key_update_simple() {
     let _guard = subscribe();
     let mut pair = Pair::default();
@@ -1574,9 +1634,8 @@ fn cid_rotation() {
         }),
         Some(Arc::new(server_config())),
         true,
-        None,
     );
-    let client = Endpoint::new(Arc::new(EndpointConfig::default()), None, true, None);
+    let client = Endpoint::new(Arc::new(EndpointConfig::default()), None, true);
 
     let mut pair = Pair::new_from_endpoint(client, server);
     let (_, server_ch) = pair.connect();
@@ -2266,12 +2325,7 @@ fn big_cert_and_key() -> (CertificateDer<'static>, PrivateKeyDer<'static>) {
 fn malformed_token_len() {
     let _guard = subscribe();
     let client_addr = "[::2]:7890".parse().unwrap();
-    let mut server = Endpoint::new(
-        Default::default(),
-        Some(Arc::new(server_config())),
-        true,
-        None,
-    );
+    let mut server = Endpoint::new(Default::default(), Some(Arc::new(server_config())), true);
     let mut buf = Vec::with_capacity(server.config().get_max_udp_payload_size() as usize);
     server.handle(
         Instant::now(),
@@ -2375,13 +2429,12 @@ fn migrate_detects_new_mtu_and_respects_original_peer_max_udp_payload_size() {
         Arc::new(server_endpoint_config),
         Some(Arc::new(server_config())),
         true,
-        None,
     );
     let client_endpoint_config = EndpointConfig {
         max_udp_payload_size: VarInt::from(client_max_udp_payload_size),
         ..EndpointConfig::default()
     };
-    let client = Endpoint::new(Arc::new(client_endpoint_config), None, true, None);
+    let client = Endpoint::new(Arc::new(client_endpoint_config), None, true);
     let mut pair = Pair::new_from_endpoint(client, server);
     pair.mtu = 1300;
 
@@ -3067,7 +3120,7 @@ fn ack_frequency_update_max_delay() {
     );
 }
 
-fn stream_chunks(mut recv: RecvStream) -> Vec<u8> {
+fn stream_chunks(mut recv: RecvStream<'_>) -> Vec<u8> {
     let mut buf = Vec::new();
 
     let mut chunks = recv.read(true).unwrap();
@@ -3379,16 +3432,92 @@ fn voluntary_ack_with_large_datagrams() {
     );
 }
 
+/// Verify that dropping oversized datagrams will trigger a DatagramsUnblocked event.
+#[test]
+fn oversized_datagrams_trigger_unblock() {
+    let _guard = subscribe();
+    let mut pair = Pair::default();
+    // Start the connection with a large MTU.
+    const INITIAL_MTU: usize = 1300;
+    pair.mtu = INITIAL_MTU;
+
+    let mut client_config = client_config();
+    let mut transport_config = TransportConfig::default();
+    let send_buffer_size = transport_config.datagram_send_buffer_size;
+    transport_config.initial_mtu(INITIAL_MTU as u16);
+    client_config.transport_config(transport_config.into());
+
+    let (client_ch, _) = pair.connect_with(client_config);
+
+    // Send datagrams until the send buffer is full.
+    let max_size = pair.client_datagrams(client_ch).max_size().unwrap();
+    let data = vec![0; max_size];
+    loop {
+        match pair
+            .client_datagrams(client_ch)
+            .send(data.clone().into(), false)
+        {
+            Ok(_) => {}
+            Err(SendDatagramError::Blocked(_)) => {
+                break;
+            }
+            Err(e) => panic!("unexpected error: {e}"),
+        }
+    }
+    // Set the MTU to a smaller value so the queued datagrams cannot be sent.
+    pair.mtu = 1200;
+
+    // Drive the pair until black hole detection kicks in and the path MTU is adjusted.
+    while pair.step() {
+        let err = loop {
+            if let Err(e) = pair
+                .client_datagrams(client_ch)
+                .send(data.clone().into(), false)
+            {
+                break e;
+            }
+        };
+        match err {
+            SendDatagramError::Blocked(_) => {
+                // continue with the next step but drain the DatagramsUnblocked events
+                // emitted datagrams were sent out.
+                while let Some(event) = pair.client_conn_mut(client_ch).poll() {
+                    tracing::info!("ignoring connection event: {event:?}");
+                }
+            }
+            SendDatagramError::TooLarge => {
+                // mtu adjusted, break the loop
+                break;
+            }
+            _ => panic!("unexpected error: {err}"),
+        }
+    }
+
+    assert_eq!(
+        pair.client_conn_mut(client_ch)
+            .stats()
+            .path
+            .black_holes_detected,
+        1,
+        "expected a black hole to have been detected",
+    );
+
+    assert_eq!(
+        pair.client_datagrams(client_ch).send_buffer_space(),
+        send_buffer_size,
+        "expected the send buffer to be empty after too large datagrams were dropped",
+    );
+    match pair.client_conn_mut(client_ch).poll() {
+        Some(Event::DatagramsUnblocked) => {}
+        _ => panic!("expected DatagramsUnblocked event"),
+    }
+}
+
 #[test]
 fn reject_short_idcid() {
     let _guard = subscribe();
     let client_addr = "[::2]:7890".parse().unwrap();
-    let mut server = Endpoint::new(
-        Default::default(),
-        Some(Arc::new(server_config())),
-        true,
-        None,
-    );
+    let mut server = Endpoint::new(Default::default(), Some(Arc::new(server_config())), true);
     let now = Instant::now();
     let mut buf = Vec::with_capacity(server.config().get_max_udp_payload_size() as usize);
     // Initial header that has an empty DCID but is otherwise well-formed

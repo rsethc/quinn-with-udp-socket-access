@@ -61,20 +61,15 @@ impl Endpoint {
     /// `allow_mtud` enables path MTU detection when requested by `Connection` configuration for
     /// better performance. This requires that outgoing packets are never fragmented, which can be
     /// achieved via e.g. the `IPV6_DONTFRAG` socket option.
-    ///
-    /// If `rng_seed` is provided, it will be used to initialize the endpoint's rng (having priority
-    /// over the rng seed configured in [`EndpointConfig`]). Note that the `rng_seed` parameter will
-    /// be removed in a future release, so prefer setting it to `None` and configuring rng seeds
-    /// using [`EndpointConfig::rng_seed`].
     pub fn new(
         config: Arc<EndpointConfig>,
         server_config: Option<Arc<ServerConfig>>,
         allow_mtud: bool,
-        rng_seed: Option<[u8; 32]>,
     ) -> Self {
-        let rng_seed = rng_seed.or(config.rng_seed);
         Self {
-            rng: rng_seed.map_or(StdRng::from_os_rng(), StdRng::from_seed),
+            rng: config
+                .rng_seed
+                .map_or_else(StdRng::from_os_rng, StdRng::from_seed),
             index: ConnectionIndex::default(),
             connections: Slab::new(),
             local_cid_generator: (config.connection_id_generator_factory.as_ref())(),
@@ -918,11 +913,18 @@ impl Endpoint {
     /// We leave some space unused so that `new_cid` can be relied upon to finish quickly. We don't
     /// bother to check when CID longer than 4 bytes are used because 2^40 connections is a lot.
     fn cids_exhausted(&self) -> bool {
-        self.local_cid_generator.cid_len() <= 4
-            && self.local_cid_generator.cid_len() != 0
-            && (2usize.pow(self.local_cid_generator.cid_len() as u32 * 8)
-                - self.index.connection_ids.len())
-                < 2usize.pow(self.local_cid_generator.cid_len() as u32 * 8 - 2)
+        let cid_len = self.local_cid_generator.cid_len();
+        if cid_len == 0 || cid_len > 4 {
+            return false;
+        }
+
+        // Keep this architecture-independent: on 32-bit targets, 2usize.pow(32) overflows.
+        let bits = (cid_len * 8) as u32;
+        let space = 1u64 << bits;
+        let reserve = 1u64 << (bits - 2);
+        let len = self.index.connection_ids.len() as u64;
+
+        len > (space - reserve)
     }
 }
 
@@ -1199,7 +1201,7 @@ impl Incoming {
 }
 
 impl fmt::Debug for Incoming {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Incoming")
             .field("addresses", &self.addresses)
             .field("ecn", &self.ecn)

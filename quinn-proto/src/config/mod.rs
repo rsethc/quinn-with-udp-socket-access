@@ -74,11 +74,11 @@ impl EndpointConfig {
     /// information in local connection IDs, e.g. to support stateless packet-level load balancers.
     ///
     /// Defaults to [`HashedConnectionIdGenerator`].
-    pub fn cid_generator<F: Fn() -> Box<dyn ConnectionIdGenerator> + Send + Sync + 'static>(
+    pub fn cid_generator(
         &mut self,
-        factory: F,
+        factory: Arc<dyn Fn() -> Box<dyn ConnectionIdGenerator> + Send + Sync>,
     ) -> &mut Self {
-        self.connection_id_generator_factory = Arc::new(factory);
+        self.connection_id_generator_factory = factory;
         self
     }
 
@@ -620,13 +620,6 @@ impl ClientConfig {
 
 #[cfg(any(feature = "rustls-aws-lc-rs", feature = "rustls-ring"))]
 impl ClientConfig {
-    /// Create a client configuration that trusts the platform's native roots
-    #[deprecated(since = "0.11.13", note = "use `try_with_platform_verifier()` instead")]
-    #[cfg(feature = "platform-verifier")]
-    pub fn with_platform_verifier() -> Self {
-        Self::try_with_platform_verifier().expect("use try_with_platform_verifier() instead")
-    }
-
     /// Create a client configuration that trusts the platform's native roots
     #[cfg(feature = "platform-verifier")]
     pub fn try_with_platform_verifier() -> Result<Self, rustls::Error> {

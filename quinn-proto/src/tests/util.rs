@@ -53,13 +53,8 @@ impl Pair {
     }
 
     pub(super) fn new(endpoint_config: Arc<EndpointConfig>, server_config: ServerConfig) -> Self {
-        let server = Endpoint::new(
-            endpoint_config.clone(),
-            Some(Arc::new(server_config)),
-            true,
-            None,
-        );
-        let client = Endpoint::new(endpoint_config, None, true, None);
+        let server = Endpoint::new(endpoint_config.clone(), Some(Arc::new(server_config)), true);
+        let client = Endpoint::new(endpoint_config, None, true);
 
         Self::new_from_endpoint(client, server)
     }
@@ -683,9 +678,8 @@ const MAX_DATAGRAMS: usize = 10;
 
 fn split_transmit(transmit: Transmit, buffer: &[u8]) -> Vec<(Transmit, Bytes)> {
     let mut buffer = Bytes::copy_from_slice(buffer);
-    let segment_size = match transmit.segment_size {
-        Some(segment_size) => segment_size,
-        _ => return vec![(transmit, buffer)],
+    let Some(segment_size) = transmit.segment_size else {
+        return vec![(transmit, buffer)];
     };
 
     let mut transmits = Vec::new();

@@ -475,9 +475,8 @@ impl PartialEncode {
         crypto: Option<(u64, &dyn crypto::PacketKey)>,
     ) {
         let Self { header_len, pn, .. } = self;
-        let (pn_len, write_len) = match pn {
-            Some((pn_len, write_len)) => (pn_len, write_len),
-            None => return,
+        let Some((pn_len, write_len)) = pn else {
+            return;
         };
 
         let pn_pos = header_len - pn_len;
@@ -576,7 +575,7 @@ impl ProtectedHeader {
 
     /// Decode a plain header from given buffer, with given [`ConnectionIdParser`].
     pub fn decode(
-        buf: &mut io::Cursor<BytesMut>,
+        buf: &mut io::Cursor<impl AsRef<[u8]>>,
         cid_parser: &(impl ConnectionIdParser + ?Sized),
         supported_versions: &[u32],
         grease_quic_bit: bool,
@@ -882,7 +881,7 @@ const KEY_PHASE_BIT: u8 = 0x04;
 
 /// Packet number space identifiers
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub enum SpaceId {
+pub(crate) enum SpaceId {
     /// Unprotected packets, used to bootstrap the handshake
     Initial = 0,
     Handshake = 1,
@@ -891,7 +890,7 @@ pub enum SpaceId {
 }
 
 impl SpaceId {
-    pub fn iter() -> impl Iterator<Item = Self> {
+    pub(crate) fn iter() -> impl Iterator<Item = Self> {
         [Self::Initial, Self::Handshake, Self::Data].iter().cloned()
     }
 }
