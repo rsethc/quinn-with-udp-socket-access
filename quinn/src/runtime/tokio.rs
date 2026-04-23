@@ -117,11 +117,13 @@ impl AsyncUdpSocket for UdpSocket {
                     Ok(result) => { 
                         if result != buf.len() { 
                             eprintln!("Hole-punch packet sent length is {result}, expected {}", buf.len());
-                            eprintln!("Local address: {:?}", io_socket.local_addr());
                         }
                     }
                     Err(err) => { 
-                        eprintln!("Failed to send a hole-punch packet: {err:?}");
+                        eprintln!(
+                            "Failed to send a hole-punch packet from {:?} to {addr:?}: {err:?}",
+                            io_socket.local_addr(),
+                        );
                     }
                 }
                 sleep(Duration::from_millis(spam_interval_millis));
