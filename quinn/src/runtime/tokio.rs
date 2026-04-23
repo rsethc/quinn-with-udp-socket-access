@@ -1,14 +1,20 @@
 use std::{
-    future::Future, io, net::{SocketAddr, SocketAddrV6}, pin::Pin, sync::Arc, task::{Context, Poll, ready}, thread::{self, sleep}, time::{Duration, Instant}
+    future::Future,
+    io,
+    net::{SocketAddr, SocketAddrV6},
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll, ready},
+    thread::{self, sleep},
+    time::{Duration, Instant}
 };
 
 use tokio::{
-    io::Interest, time::{Sleep, sleep_until}
+    io::Interest,
+    time::{Sleep, sleep_until}
 };
 
-use crate::Runtime;
-
-use super::{AsyncTimer, AsyncUdpSocket, UdpSenderHelper, UdpSenderHelperSocket};
+use super::{AsyncTimer, AsyncUdpSocket, Runtime, UdpSenderHelper, UdpSenderHelperSocket};
 
 /// A Quinn runtime for Tokio
 #[derive(Debug)]
