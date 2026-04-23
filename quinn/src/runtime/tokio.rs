@@ -117,6 +117,7 @@ impl AsyncUdpSocket for UdpSocket {
                     Ok(result) => { 
                         if result != buf.len() { 
                             eprintln!("Hole-punch packet sent length is {result}, expected {}", buf.len());
+                            eprintln!("Local address: {:?}", io_socket.local_addr());
                         }
                     }
                     Err(err) => { 
