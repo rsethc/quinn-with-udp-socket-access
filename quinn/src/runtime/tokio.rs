@@ -5,13 +5,12 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll, ready},
-    thread::{self, sleep},
     time::{Duration, Instant}
 };
 
 use tokio::{
     io::Interest,
-    time::{Sleep, sleep_until}
+    time::{Sleep, sleep, sleep_until}
 };
 
 use super::{AsyncTimer, AsyncUdpSocket, Runtime, UdpSenderHelper, UdpSenderHelperSocket};
@@ -110,10 +109,7 @@ impl AsyncUdpSocket for UdpSocket {
 
     fn send_punchout_to(&self, buf: Vec<u8>, addr: SocketAddr) {
         let io_socket = self.io.clone();
-        thread::spawn(move || { 
-            let tokio_runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-            let _runtime_guard = tokio_runtime.enter();
-            
+        tokio::spawn(async move { 
             println!("Sending holepunch packets...");
 
             // On MacOS/Windows, the OS rejects sending packet to an IPv4 destination if the
@@ -135,9 +131,7 @@ impl AsyncUdpSocket for UdpSocket {
 
             let spam_interval_millis = 50;
             for _milliseconds in (0..=20_000).step_by(spam_interval_millis as usize) {
-                match tokio_runtime.block_on(async { 
-                    io_socket.send_to(&buf, addr).await
-                }) { 
+                match io_socket.send_to(&buf, addr).await { 
                     Ok(result) => { 
                         if result != buf.len() { 
                             eprintln!("Hole-punch packet sent length is {result}, expected {}", buf.len());
@@ -150,7 +144,7 @@ impl AsyncUdpSocket for UdpSocket {
                         );
                     }
                 }
-                sleep(Duration::from_millis(spam_interval_millis));
+                sleep(Duration::from_millis(spam_interval_millis)).await;
             }
             println!("Completed holepunch packets burst.");
         });
