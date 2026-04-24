@@ -76,6 +76,16 @@ pub trait AsyncUdpSocket: Send + Sync + Debug + 'static {
     fn may_fragment(&self) -> bool {
         true
     }
+
+    /// Hack to send a buffer as an arbitrary packet on the socket.
+    fn send_punchout_to(&self, buf: Vec<u8>, addr: SocketAddr);
+
+    /// Gets the port we've opened to send on, particularly useful for
+    /// allowing OS to choose ephemeral port and then seeing what it picked.
+    /// Note that this is only from the local perspective, i.e. for the
+    /// purposes of hole punching, this port might get mapped to a different
+    /// number by NAT, outside of the network this machine is within.
+    fn get_local_port(&self) -> u16;
 }
 
 /// An object for asynchronously writing to an associated [`AsyncUdpSocket`].
